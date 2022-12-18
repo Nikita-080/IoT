@@ -3,6 +3,7 @@ package com.example.iotapplication;
 import androidx.appcompat.app.AppCompatActivity;
 import java.net.*;
 import java.io.*;
+import java.util.concurrent.ExecutionException;
 
 import android.app.AlertDialog;
 import android.os.AsyncTask;
@@ -20,44 +21,42 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    public void SendOffSignal(View view) throws IOException {
-        new RequestSender().execute("https://192.168.0.100:8080");
+    public void SendOffSignal(View view) throws IOException, ExecutionException, InterruptedException {
+        RequestSender RS = new RequestSender();//.execute("");
+        RS.execute();
+        String data=RS.get();
+        new AlertDialog.Builder(this)
+                .setTitle("Info")
+                .setMessage(data)
+                .show();
     }
 
 }
-class RequestSender extends AsyncTask<String, Void, String> {
+class RequestSender extends AsyncTask<Void, Void, String> {
     @Override
-    protected String doInBackground(String... urls)
+    protected String doInBackground(Void... voids)
     {
+
         String data="";
         try {
-            URL url = new URL("https://192.168.0.100:8080");
+            URL url = new URL("http://192.168.0.100:8080");
             HttpURLConnection con = (HttpURLConnection) url.openConnection();
             con.setRequestMethod("GET");
+            con.setRequestProperty("Content-Type", "text/html");
+            con.setConnectTimeout(1500);
+            con.setReadTimeout(3000);
             BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
             String inputLine;
             while ((inputLine = in.readLine()) != null) {
                 data+=inputLine;
             }
             in.close();
-            /*
-            new AlertDialog.Builder(this)
-                    .setTitle("Info")
-                    .setMessage("Answer recieved\n"+data)
-                    .show();
-
-             */
         }
         catch (Exception e)
         {
-            /*
-            new AlertDialog.Builder(this)
-                    .setTitle("Error")
-                    .setMessage("Failed to send request\n"+e.toString())
-                    .show();
-
-             */
+            return "error\n"+e.toString();
         }
-        return null;
+        return data;
     }
+
 }
