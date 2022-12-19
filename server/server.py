@@ -2,20 +2,22 @@ from http.server import HTTPServer, BaseHTTPRequestHandler #класс
 
 from io import BytesIO #класс
 
-import random#класс 
-
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
-
+    toclientmessage=''
+    
     # определяем метод `do_GET` 
     def do_GET(self):
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
-        self.end_headers()
-
-        s=random.choice(["no","18.12.2022 14:30"])
-        print(s)
-        self.wfile.write(str.encode(s))
+        self.end_headers
+        print(toclientmessage)
+        if(toclientmessage==''):
+            self.wfile.write(str.encode('no'))
+        else:
+            self.wfile.write(str.encode(toclientmessage))
+            toclientmessage=''
+        
 
     # определяем метод `do_POST` 
     def do_POST(self):
