@@ -1,0 +1,73 @@
+скачать образ по этой ссылке https://drive.google.com/open?id=1WStjumory1-l0hR70wnayQQ3FWMeb-9T
+распаковать образ tar -xvf debian.tar.gz
+сверить контрольные суммы test "`md5sum debian.img` = `cat debian.img | grep -o '^\w*'`"; echo $?
+записать образ на cd карту dd if=/dev/mmcb0 of=./debain.img bs=4M
+Воткнуть по LAN кабелю в DHCP(роутер)
+найти OrangePi nmap -sS 192.168.0.0/24 -p 22
+подсоединиться по ssh ssh root@192.168.0.12
+создать пользователя useradd ded_moroz -G adm,sudo,video,plugdev
+задать ему пароль passwd ded_moroz
+отключить пароли других пользователей passwd -l root; passwd -l orangepi
+завершить ssh сессию exit
+закинуть на хост свой ssh ключь на orangepi ssh-copy-id -i ~/.ssh/id_rsa ded_moroz@192.168.0.2
+подключиться к новому пользователю ssh ded_moroz@192.168.0.2
+обновить систему sudo apt update; sudo apt upgrade
+установить необходимые в работе пакеты sudo apt install python3 screen python3-pip
+установить библиотеки python для работы с gpio портами sudo pip install --upgrade OPi.GPIO
+скачать исходные коды библиотеки и утилиты для работы с gpio портами git clone https://github.com/sunzone93/WiringOP-Zero.git
+собрать и установить WiringOP-Zero cd WiringOP-Zero; chmod u+x ./build; sudo ./build
+узнать распиновку платы gpio readall
+вывод:
++-----+-----+----------+------+--Orange Pi Zero--+------+----------+-----+-----+
+| H2+ | wPi |   Name   | Mode | V | Physical | V | Mode | Name     | wPi | H2+ |
++-----+-----+----------+------+---+----++----+---+------+----------+-----+-----+
+|     |     |     3.3v |      |   |  1 || 2  |   |      | 5v       |     |     |
+|  12 |   8 |    SDA.0 | ALT3 | 0 |  3 || 4  |   |      | 5V       |     |     |
+|  11 |   9 |    SCL.0 | ALT3 | 0 |  5 || 6  |   |      | 0v       |     |     |
+|   6 |   7 |   GPIO.7 | ALT3 | 0 |  7 || 8  | 0 | ALT3 | TxD3     | 15  | 198 |
+|     |     |       0v |      |   |  9 || 10 | 0 | ALT3 | RxD3     | 16  | 199 |
+|   1 |   0 |     RxD2 | ALT3 | 0 | 11 || 12 | 0 | OUT  | GPIO.1   | 1   | 7   |
+|   0 |   2 |     TxD2 | ALT3 | 0 | 13 || 14 |   |      | 0v       |     |     |
+|   3 |   3 |     CTS2 | ALT3 | 0 | 15 || 16 | 0 | ALT3 | GPIO.4   | 4   | 19  |
+|     |     |     3.3v |      |   | 17 || 18 | 0 | ALT3 | GPIO.5   | 5   | 18  |
+|  15 |  12 |     MOSI | ALT3 | 0 | 19 || 20 |   |      | 0v       |     |     |
+|  16 |  13 |     MISO | ALT3 | 0 | 21 || 22 | 0 | ALT3 | RTS2     | 6   | 2   |
+|  14 |  14 |     SCLK | ALT3 | 0 | 23 || 24 | 0 | ALT3 | CE0      | 10  | 13  |
+|     |     |       0v |      |   | 25 || 26 | 0 | ALT3 | GPIO.11  | 11  | 10  |
++-----+-----+----------+------+---+---LEDs---+---+------+----------+-----+-----+
+|  17 |  30 | STAT-LED |  OUT | 0 | 27 || 28 |   |      | PWR-LED  |     |     |
++-----+-----+----------+------+---+-----+----+---+------+----------+-----+-----+
+| H2+ | wPi |   Name   | Mode | V | Physical | V | Mode | Name     | wPi | H2+ |
++-----+-----+----------+------+--Orange Pi Zero--+---+------+---------+-----+--+
+
+создать правила udev для доступа к портам gpio без необходимости иметь права root sudo vim /etc/udev/rules.d/99-gpio.rules
+
+SUBSYSTEM=="gpio", KERNEL=="gpiochip*", ACTION=="add", PROGRAM="/bin/sh -c 'chown root:gpio /sys/class/gpio/export /sys/class/gpio/unexport ; chmod 220 /sys/class/gpio/export /sys/class/gpio/unexport'"
+SUBSYSTEM=="gpio", KERNEL=="gpio*", ACTION=="add", RUN+="/usr/bin/gpio_add.sh $devpath"
+
+создать скрипт gpio_add.sh, использующийся в правиле udev sudo vim /usr/bin/gpio_add.sh
+
+#!/bin/sh
+gpio_path=$1
+chown root:gpio /sys$gpio_path/active_low /sys$gpio_path/direction /sys$gpio_path/edge /sys$gpio_path/value
+chmod 660 /sys$gpio_path/active_low /sys$gpio_path/direction /sys$gpio_path/edge /sys$gpio_path/value
+echo $gpio_path
+
+разрешить его на запуск sudo chmod u+x /usr/bin/gpio_add.sh
+презапустить систему для внесения всех изменений(правила udev, обновленное ядро и его модули)
+
+проверить работу gpio портов с помощью светодиода
+import OPi.GPIO as GPIO
+import time
+
+GPIO.setmode(GPIO.BOARD)
+GPIO.setup(12, GPIO.OUT)
+GPIO.output(12, 1);
+time.sleep(2.5)
+GPIO.output(12, 0)
+GPIO.cleanup(12)
+
+анод светодиода подключаем к 12 порту, а катод к порту 14(земля) согласно схеме
+проверяем python3 blink.py
+Результат - светодиод моргнул.
+На этом установку можно считать завершенной, все готово к работе.
