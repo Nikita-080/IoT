@@ -1,3 +1,4 @@
+from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler #класс
 
 from io import BytesIO #класс
@@ -32,6 +33,8 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         response.write(body)
         self.wfile.write(response.getvalue())
 
+        toclientmessage=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
         print(body)
 
 httpd = HTTPServer(('', 8080), SimpleHTTPRequestHandler)
