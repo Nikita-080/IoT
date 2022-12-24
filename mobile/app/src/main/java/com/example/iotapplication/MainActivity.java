@@ -5,7 +5,9 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import java.net.*;
 import java.io.*;
+import java.util.Date;
 import java.util.concurrent.TimeUnit;
+
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.os.AsyncTask;
@@ -28,7 +30,7 @@ public class MainActivity extends AppCompatActivity {
         createNotificationChannel();
 
         RequestSender RC = new RequestSender();
-        RC.execute(this);
+        RC.execute();
     }
 
     private void createNotificationChannel() {
@@ -44,19 +46,17 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    class RequestSender extends AsyncTask<MainActivity, String, Void> {
+    class RequestSender extends AsyncTask<Void, String, Void> {
         @Override
-        protected Void doInBackground(MainActivity... wins)
+        protected Void doInBackground(Void... voids)
         {
             while (true) {
                 String data = "";
-                try {
-                    URL url = new URL("http://192.168.0.100:8080");
+                try { //http://192.168.43.211:8080
+                    URL url = new URL("http://192.168.43.42:8080");
                     HttpURLConnection con = (HttpURLConnection) url.openConnection();
                     con.setRequestMethod("GET");
                     con.setRequestProperty("Content-Type", "text/html");
-                    con.setConnectTimeout(1500);
-                    con.setReadTimeout(1500);
                     BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
                     String inputLine;
                     while ((inputLine = in.readLine()) != null) {
@@ -64,14 +64,14 @@ public class MainActivity extends AppCompatActivity {
                     }
                     in.close();
                 } catch (Exception e) {
-                    data = "error " + e.getMessage();
+                    data = "error " + e.toString();
                 }
                 publishProgress(data);
 
                 try {
                     TimeUnit.SECONDS.sleep(5);
                 } catch (InterruptedException e) {
-                    data = "error " + e.getMessage();
+                    data = "error " + e.toString();
                     publishProgress(data);
                 }
             }
@@ -91,7 +91,7 @@ public class MainActivity extends AppCompatActivity {
                 NotificationManagerCompat notificationManager = NotificationManagerCompat.from(getApplicationContext());
                 notificationManager.notify(100, builder.build());
             }
-            else if (!messages[0].equals("no")) {
+            else if (messages[0].equals("w")) {
                 NotificationCompat.Builder builder = new NotificationCompat.Builder(getApplicationContext(), "101")
                         .setSmallIcon(R.drawable.signalicon)
                         .setContentTitle("ВНИМАНИЕ")
@@ -104,7 +104,8 @@ public class MainActivity extends AppCompatActivity {
                 NotificationManagerCompat notificationManager = NotificationManagerCompat.from(getApplicationContext());
                 notificationManager.notify(id, builder.build());
 
-                tv.setText(messages[0]);
+                Date date = new Date();
+                tv.setText(date.toString());
             }
         }
     }
