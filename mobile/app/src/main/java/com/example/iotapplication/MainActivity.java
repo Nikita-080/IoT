@@ -13,12 +13,16 @@ import android.app.NotificationManager;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.View;
+import android.widget.Button;
 import android.widget.TextView;
 
 public class MainActivity extends AppCompatActivity {
 
     int id=100;
     TextView tv;
+    Button btn_on;
+    Button btn_off;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -26,6 +30,22 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         tv=findViewById(R.id.textView);
+        btn_on = findViewById(R.id.button2);
+        btn_off = findViewById(R.id.button);
+
+        btn_on.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                new OnOffSender().execute("on");
+            }
+        });
+
+        btn_off.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                new OnOffSender().execute("off");
+            }
+        });
 
         createNotificationChannel();
 
@@ -46,13 +66,36 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    class OnOffSender extends AsyncTask<String, Void, Void> {
+        @Override
+        protected Void doInBackground(String... strings) {
+            try {
+                URL url = new URL("http://192.168.43.42:8080");
+                HttpURLConnection con = (HttpURLConnection) url.openConnection();
+                con.setRequestMethod("POST");
+                con.setRequestProperty("Content-Type", "text/html");
+                con.setDoOutput(true);
+
+                DataOutputStream dStream = new DataOutputStream(con.getOutputStream());
+                dStream.writeBytes(strings[0]);
+                dStream.flush();
+                dStream.close();
+
+            } catch (Exception e) {
+                //TODO
+            }
+            return null;
+        }
+    }
+
+
     class RequestSender extends AsyncTask<Void, String, Void> {
         @Override
         protected Void doInBackground(Void... voids)
         {
             while (true) {
                 String data = "";
-                try { //http://192.168.43.211:8080
+                try {
                     URL url = new URL("http://192.168.43.42:8080");
                     HttpURLConnection con = (HttpURLConnection) url.openConnection();
                     con.setRequestMethod("GET");
