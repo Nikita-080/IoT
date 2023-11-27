@@ -54,8 +54,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     Button btn_qr;
     String CommandPath ="CashCommand.txt";
     String TokenPath="Token.txt";
+    String AddressPath="ServerAddress.txt";
     Logger logger;
-    String ServerAddress ="http://192.168.1.100:8080";
+    String ServerAddress;
     String token;
 
     @Override
@@ -82,7 +83,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             logger.addHandler(logHandler);
             logger.log(Level.INFO, "logger is ready");
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "logger is not ready", e);
+            logger.log(Level.SEVERE, "logger is not ready");
         }
         //LOGGER CONFIG [END]
 
@@ -93,6 +94,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         createNotificationChannel();
 
         token=GetStringFromFile(TokenPath);
+        ServerAddress=GetStringFromFile(AddressPath);
         tv_token.setText(token);
 
         ShowConnectionOff();
@@ -113,9 +115,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         IntentResult intentResult = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
         if (intentResult != null) {
             if (intentResult.getContents() == null) {
-                logger.log(Level.SEVERE, "QR reading - canceled");
+                logger.log(Level.WARNING, "QR reading - canceled");
             } else {
-                token=intentResult.getContents();
+                String[] ConnectionData=intentResult.getContents().split("-");
+                ServerAddress=ConnectionData[0];
+                token=ConnectionData[1];
+                SetStringToFile(ServerAddress,AddressPath);
+                SetStringToFile(token,TokenPath);
                 tv_token.setText(token);
             }
         } else {
@@ -136,7 +142,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             SetStringToFile("none",path);
         }
         catch(IOException ex) {
-            logger.log(Level.SEVERE,"read file "+path,ex);
+            logger.log(Level.SEVERE,"read file "+path);
         }
         return "none";
     }
@@ -148,7 +154,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             fos.close();
         }
         catch(IOException ex) {
-            logger.log(Level.SEVERE,"write file "+path,ex);
+            logger.log(Level.SEVERE,"write file "+path);
         }
 
     }
@@ -222,7 +228,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             logger.log(Level.INFO,"command "+command+" sent, code: "+ r +" data: "+data);
 
                         } catch (Exception e) {
-                            logger.log(Level.SEVERE,"connection failure",e);
+                            logger.log(Level.SEVERE,"connection failure");
                             publishProgress("connection off");
                             try {TimeUnit.SECONDS.sleep(2);} catch (InterruptedException ignored) {}
                         }
@@ -246,7 +252,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     in.close();
                     publishProgress("connection on");
                 } catch (Exception e) {
-                    logger.log(Level.SEVERE,"connection failure",e);
+                    logger.log(Level.SEVERE,"connection failure");
                     publishProgress("connection off");
                 }
                 publishProgress(data.toString());
