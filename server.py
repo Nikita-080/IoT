@@ -6,6 +6,7 @@ import socket
 import io
 import qrcode
 from io import BytesIO #класс
+import ssl
 
 def random_token():
     str1 = '123456789'
@@ -96,4 +97,7 @@ print(f.read())
 print(get_local_ip())
 print(token)
 httpd = HTTPServer(('', 8080), SimpleHTTPRequestHandler)
+ssl_context = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS_SERVER)
+ssl_context.load_cert_chain('./app.crt',keyfile='./app.key')
+httpd.socket = ssl_context.wrap_socket (httpd.socket, server_side=True)
 httpd.serve_forever()
