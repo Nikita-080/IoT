@@ -26,23 +26,39 @@ import androidx.core.content.ContextCompat;
 import com.google.zxing.integration.android.IntentIntegrator;
 import com.google.zxing.integration.android.IntentResult;
 
+import org.apache.http.conn.ssl.AllowAllHostnameVerifier;
+
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyManagementException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
+
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManagerFactory;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
     int id=100;
@@ -52,7 +68,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     Button btn_on;
     Button btn_off;
     Button btn_qr;
-    String CommandPath ="CashCommand.txt";
+    String CommandPath ="Command.txt";
     String TokenPath="Token.txt";
     String AddressPath="ServerAddress.txt";
     Logger logger;
@@ -184,6 +200,30 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     @SuppressLint("StaticFieldLeak")
     class RequestSender extends AsyncTask<Void, String, Void> {
+        SSLSocketFactory GetSSL() {
+            try {
+                CertificateFactory cf = CertificateFactory.getInstance("X.509");
+                InputStream caInput = new BufferedInputStream(getResources().openRawResource(R.raw.app));
+                Certificate ca = cf.generateCertificate(caInput);
+                caInput.close();
+                String keyStoreType = KeyStore.getDefaultType();
+                KeyStore keyStore = KeyStore.getInstance(keyStoreType);
+                keyStore.load(null, null);
+                keyStore.setCertificateEntry("ca", ca);
+                String tmfAlgorithm = TrustManagerFactory.getDefaultAlgorithm();
+                TrustManagerFactory tmf = TrustManagerFactory.getInstance(tmfAlgorithm);
+                tmf.init(keyStore);
+                SSLContext context = SSLContext.getInstance("TLS");
+                context.init(null, tmf.getTrustManagers(), null);
+                return context.getSocketFactory();
+            }
+            catch (Exception e)
+            {
+                logger.log(Level.SEVERE,"SSL error",e);
+                return null;
+            }
+        }
+        @SuppressLint("AllowAllHostnameVerifier")
         @Override
         protected Void doInBackground(Void... voids)
         {
@@ -198,7 +238,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             logger.log(Level.INFO,"try to send command "+command);
 
                             URL obj = new URL(ServerAddress);
-                            HttpURLConnection con = (HttpURLConnection) obj.openConnection();
+                            HttpsURLConnection con = (HttpsURLConnection) obj.openConnection();
+                            con.setSSLSocketFactory(GetSSL());
                             con.setRequestMethod("POST");
                             con.setConnectTimeout(2000);
                             con.setRequestProperty("Content-Type", "text/html");
@@ -228,7 +269,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             logger.log(Level.INFO,"command "+command+" sent, code: "+ r +" data: "+data);
 
                         } catch (Exception e) {
-                            logger.log(Level.SEVERE,"connection failure");
+                            logger.log(Level.SEVERE,"connection failure",e);
                             publishProgress("connection off");
                             try {TimeUnit.SECONDS.sleep(2);} catch (InterruptedException ignored) {}
                         }
@@ -238,7 +279,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 StringBuilder data = new StringBuilder();
                 try {
                     URL url = new URL(ServerAddress);
-                    HttpURLConnection con = (HttpURLConnection) url.openConnection();
+                    HttpsURLConnection con = (HttpsURLConnection) url.openConnection();
+                    con.setHostnameVerifier(new AllowAllHostnameVerifier()); //only for testing app
+                    con.setSSLSocketFactory(GetSSL());
                     con.setConnectTimeout(2000);
                     con.setRequestMethod("GET");
                     con.setRequestProperty("Content-Type", "text/html");
@@ -252,7 +295,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     in.close();
                     publishProgress("connection on");
                 } catch (Exception e) {
-                    logger.log(Level.SEVERE,"connection failure");
+                    logger.log(Level.SEVERE,"connection failure",e);
                     publishProgress("connection off");
                 }
                 publishProgress(data.toString());
