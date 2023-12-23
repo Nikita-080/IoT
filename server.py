@@ -2,11 +2,14 @@ from http.server import HTTPServer, BaseHTTPRequestHandler #класс
 import qrcode
 import random
 import socket
-
+import logging
 import io
 import qrcode
 from io import BytesIO #класс
 import ssl
+
+logging.basicConfig(level=logging.INFO, filename="py_log.log",filemode="w",
+                    format="%(asctime)s %(levelname)s %(message)s")
 
 def random_token():
     str1 = '123456789'
@@ -44,11 +47,13 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                     self.wfile.write(str.encode("empty"))
                 else:
                     self.wfile.write(str.encode("w"))
+                    logging.info("Mobile User Request")
                     toclientmessage=''
             else:
                 self.send_response(403)
                 self.end_headers()
         else:
+            
             self.wfile.write(str.encode(frommobile))
         
 
@@ -63,9 +68,11 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         if(User_Agent=='mobile'):
             if(token==User_Token):
                 frommobile = self.rfile.read(content_length)
+                logging.info(f"Token valide. Mobile User {frommobile} device")
                 self.send_response(200)
                 self.end_headers()
             else:
+                logging.info("Try connect. Token not valide")
                 self.send_response(403)
                 self.end_headers()
         elif(User_Agent=='Embedded'):            
@@ -73,14 +80,12 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-type', 'text/html')
             self.end_headers()
-            response = BytesIO()
-            response.write(b'This is POST request. ')
-            response.write(b'Received: ')
-            response.write(body)
-            self.wfile.write(response.getvalue())
+            self.wfile.write(str.encode(""))
             toclientmessage="notnull"
+            logging.info("Alarm Signal")
             print(body)
         else:
+            logging.info("Unknown User")
             self.send_response(400)
             self.end_headers()
 
