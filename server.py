@@ -3,7 +3,8 @@ import qrcode
 import random
 import socket
 
-
+import io
+import qrcode
 from io import BytesIO #класс
 
 def random_token():
@@ -85,9 +86,13 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     
   
 data = "http://" + str(get_local_ip()) + ":8080-"+token
-filename = "site.png"
-img = qrcode.make(data)
-img.save(filename)
+qr = qrcode.QRCode()
+qr.add_data(data)
+f = io.StringIO()
+qr.print_ascii(out=f)
+f.seek(0)
+print(f.read())
+
 print(get_local_ip())
 print(token)
 httpd = HTTPServer(('', 8080), SimpleHTTPRequestHandler)
