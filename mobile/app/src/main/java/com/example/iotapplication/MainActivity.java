@@ -1,12 +1,9 @@
 package com.example.iotapplication;
 
-import android.Manifest;
 import android.annotation.SuppressLint;
-import android.app.AlertDialog;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -18,10 +15,8 @@ import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
-import androidx.core.content.ContextCompat;
 
 import com.google.zxing.integration.android.IntentIntegrator;
 import com.google.zxing.integration.android.IntentResult;
@@ -38,15 +33,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.security.KeyManagementException;
 import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
 import java.security.cert.Certificate;
-import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
@@ -239,6 +229,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                             URL obj = new URL(ServerAddress);
                             HttpsURLConnection con = (HttpsURLConnection) obj.openConnection();
+                            con.setHostnameVerifier(new AllowAllHostnameVerifier()); //only for testing app
                             con.setSSLSocketFactory(GetSSL());
                             con.setRequestMethod("POST");
                             con.setConnectTimeout(2000);
