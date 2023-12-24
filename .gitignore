@@ -1,3 +1,4 @@
 certs/*.key
 certs/*.csr
 certs/*.crt
+embedded/embedded_programm/*.crt
