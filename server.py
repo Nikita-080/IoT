@@ -21,7 +21,7 @@ def random_token():
     psw = ''.join([random.choice(ls) for x in range(4)])
     return psw
 toclientmessage=''
-frommobile=''#Embedded
+frommobile=b''#Embedded
 token=str(random_token())
 
 def get_local_ip():
@@ -33,8 +33,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     
     # определяем метод `do_GET` 
     def do_GET(self):
-        print("receive get")
-        global toclientmessage
+        global toclientmessage, frommobile
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
@@ -42,7 +41,8 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         User_Token = str(self.headers['token'])
         if(User_Agent=='mobile'):
             if(token==User_Token):  
-                print(toclientmessage)
+                #print(toclientmessage)    
+                print("receive get from mobile")
                 if(toclientmessage==''):
                     self.wfile.write(str.encode("empty"))
                 else:
@@ -50,32 +50,44 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                     logging.info("Mobile User Request")
                     toclientmessage=''
             else:
+                print("receive get from mobile with unknown token")
                 self.send_response(403)
                 self.end_headers()
-        else:
+        elif(User_Agent=='Embedded'):
+            #if(frommobile)
+            print("receive get from Embedded")
+            print(frommobile)  
+            self.wfile.write(frommobile)#запрос включения/выключения от устройства
+            frommobile=b''
             
-            self.wfile.write(str.encode(frommobile))
-        
+            
+        else:
+            logging.info("Unknown User")
+            self.send_response(400)
+            self.end_headers()
+
 
     # определяем метод `do_POST` 
     def do_POST(self):
-        print("receive post")
-        global toclientmessage
+        global toclientmessage,frommobile
         content_length = int(self.headers['Content-Length'])
         User_Agent = str(self.headers['User-Agent'])
         User_Token = str(self.headers['token'])
         
         if(User_Agent=='mobile'):
             if(token==User_Token):
-                frommobile = self.rfile.read(content_length)
+                print("receive post from mobile")
+                frommobile = self.rfile.read(content_length)#включение/выключение
                 logging.info(f"Token valide. Mobile User {frommobile} device")
                 self.send_response(200)
                 self.end_headers()
             else:
                 logging.info("Try connect. Token not valide")
+                print("receive post from mobile with unknown token")
                 self.send_response(403)
                 self.end_headers()
-        elif(User_Agent=='Embedded'):            
+        elif(User_Agent=='Embedded'):
+            print("receive post from Embedded")
             body = self.rfile.read(content_length)
             self.send_response(200)
             self.send_header('Content-type', 'text/html')
@@ -91,7 +103,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
     
   
-data = "http://" + str(get_local_ip()) + ":8080-"+token
+data = "https://" + str(get_local_ip()) + ":8080-"+token
 qr = qrcode.QRCode()
 qr.add_data(data)
 f = io.StringIO()
