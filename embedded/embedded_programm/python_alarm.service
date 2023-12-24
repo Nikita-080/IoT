@@ -6,11 +6,11 @@ After=network.target
 [Service]
 Type=simple
 PIDFile=/run/alarm_service.pid
-ExecStart=
+WorkingDirectory=/home/ded_moroz/Source/python/embedded_programm
+ExecStart=python3 main.py
 Restart=on-failure
 OOMScoreAdjust=-100
-StandardOutput=syslog
-StandardError=syslog
+User=ded_moroz
 SyslogIdentifier="Alarm_service"
 
 [Install]
