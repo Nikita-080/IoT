@@ -128,7 +128,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 token=ConnectionData[1];
                 SetStringToFile(ServerAddress,AddressPath);
                 SetStringToFile(token,TokenPath);
-                tv_token.setText(token);
+                tv_token.setText(ServerAddress+' '+token);
             }
         } else {
             super.onActivityResult(requestCode, resultCode, data);
@@ -226,7 +226,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         try {
                             command=GetStringFromFile(CommandPath);
                             logger.log(Level.INFO,"try to send command "+command);
-
+                            //ServerAddress="https://192.168.43.42:8080";//DEL
+                            //token="Q66U";//DEL
                             URL obj = new URL(ServerAddress);
                             HttpsURLConnection con = (HttpsURLConnection) obj.openConnection();
                             con.setHostnameVerifier(new AllowAllHostnameVerifier()); //only for testing app
@@ -235,14 +236,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             con.setConnectTimeout(2000);
                             con.setRequestProperty("Content-Type", "text/html");
                             con.setRequestProperty("User-Agent", "mobile");
-                            con.setRequestProperty("Token", token);
+                            con.setRequestProperty("token", token);
                             con.setDoOutput(true);
 
                             OutputStream os = con.getOutputStream();
                             byte[] input = command.getBytes(StandardCharsets.UTF_8);
                             os.write(input, 0, input.length);
 
-                            int r=con.getResponseCode();
+                            int code=con.getResponseCode();
 
                             BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
                             String inputLine;
@@ -253,12 +254,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             }
                             in.close();
 
-
-                            publishProgress("connection on");
-                            endOperation=true;
-                            SetStringToFile("none", CommandPath);
-                            logger.log(Level.INFO,"command "+command+" sent, code: "+ r +" data: "+data);
-
+                            if (code==200)
+                            {
+                                publishProgress("connection on");
+                                endOperation=true;
+                                SetStringToFile("none", CommandPath);
+                                logger.log(Level.INFO,"command "+command+" sent, code: "+ code +" data: "+data);
+                            }
+                            else
+                            {
+                                publishProgress("connection off");
+                                logger.log(Level.SEVERE,"connection error: code "+code);
+                            }
                         } catch (Exception e) {
                             logger.log(Level.SEVERE,"connection failure",e);
                             publishProgress("connection off");
@@ -269,6 +276,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                 StringBuilder data = new StringBuilder();
                 try {
+                    //ServerAddress="https://192.168.43.42:8080";//DEL
+                    //token="HeUb";//DEL
                     URL url = new URL(ServerAddress);
                     HttpsURLConnection con = (HttpsURLConnection) url.openConnection();
                     con.setHostnameVerifier(new AllowAllHostnameVerifier()); //only for testing app
@@ -277,14 +286,23 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     con.setRequestMethod("GET");
                     con.setRequestProperty("Content-Type", "text/html");
                     con.setRequestProperty("User-Agent", "mobile");
-                    con.setRequestProperty("Token", token);
+                    con.setRequestProperty("token", token);
                     BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
                     String inputLine;
                     while ((inputLine = in.readLine()) != null) {
                         data.append(inputLine);
                     }
                     in.close();
-                    publishProgress("connection on");
+                    int code=con.getResponseCode();
+                    if (code==200)
+                    {
+                        publishProgress("connection on");
+                    }
+                    else
+                    {
+                        publishProgress("connection off");
+                        logger.log(Level.SEVERE,"connection error: code "+code);
+                    }
                 } catch (Exception e) {
                     logger.log(Level.SEVERE,"connection failure",e);
                     publishProgress("connection off");
