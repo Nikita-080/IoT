@@ -4,6 +4,9 @@ import time
 
 from threading import Thread
 
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.SecurityWarning)
+
 
 alarm_working = True
 
@@ -20,7 +23,6 @@ def ask_server():
     while True:
         response = requests.get("https://serverapp:8080", headers=headers, verify="app.crt")
         if response.status_code == 200:
-            print("Get state:", response.text)
             if response.text == "on":
                 alarm_working = True
                 print("Alarm state is on.")
