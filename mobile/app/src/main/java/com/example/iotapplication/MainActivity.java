@@ -35,7 +35,10 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyManagementException;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
@@ -66,7 +69,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     final String SERVER_ADDRESS_PATH = "ServerAddress.txt";
 
     final Integer LOG_FILE_COUNT = 5;
-    final Integer LOG_SIZE = 102400;
+    final Integer LOG_SIZE = 1024*100;
     final Boolean LOG_APPEND = true;
     final String LOG_FILE_NAME_PATTERN = "Iot_App_Log_%g.log";
 
@@ -76,10 +79,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     final Integer FIRST_NOTIFICATION_ID = 100;
     final Integer MAX_NOTIFICATION_ID = 200;
 
+    final Integer REQUEST_OK=200;
 
-    final Integer CONNECTION_ON_CODE = 0;
-    final Integer CONNECTION_OFF_CODE = 1;
-    final Integer ALARM_CODE = 2;
+    enum CODE{
+        CONNECTION_ON,
+        CONNECTION_OFF,
+        ALARM
+    }
 
     Logger logger;
     String serverAddress;
@@ -113,7 +119,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             logger.log(Level.INFO, "logger is ready");
         } catch (IOException e) {
-            logger.log(Level.SEVERE, "logger is not ready",e);
+            logger.log(Level.SEVERE, "logger is not ready: input/output",e);
+        }
+        catch (Exception e) {
+            logger.log(Level.SEVERE, "logger is not ready: unexpected",e);
         }
 
         buttonOn.setOnClickListener(v -> setStringToFile("on",
@@ -154,23 +163,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             if (intentResult.getContents() == null) {
                 logger.log(Level.WARNING, "QR reading - canceled");
             } else {
-<<<<<<< Updated upstream
-                String[] ConnectionData=intentResult.getContents().split("-");
-                ServerAddress=ConnectionData[0];
-                token=ConnectionData[1];
-                SetStringToFile(ServerAddress,AddressPath);
-                SetStringToFile(token,TokenPath);
-                tv_token.setText(ServerAddress+' '+token);
-=======
-                String[] ConnectionData = intentResult.getContents().split("-");
-                serverAddress = ConnectionData[0];
-                token = ConnectionData[1];
-
-                setStringToFile(serverAddress, SERVER_ADDRESS_PATH);
-                setStringToFile(token, TOKEN_PATH);
-
-                textToken.setText(token);
->>>>>>> Stashed changes
+                String[] connectionData=intentResult.getContents().split("-");
+                serverAddress=connectionData[0];
+                token=connectionData[1];
+                setStringToFile(serverAddress,SERVER_ADDRESS_PATH);
+                setStringToFile(token,TOKEN_PATH);
+                textToken.setText(String .format("%s %s",serverAddress,token));
             }
         } else {
             super.onActivityResult(requestCode, resultCode, data);
@@ -187,7 +185,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         } catch (FileNotFoundException ex) {
             setStringToFile("none", path);
         } catch (IOException ex) {
-            logger.log(Level.SEVERE, String.format("read file %s", path));
+            logger.log(Level.SEVERE, String.format("read file %s : input/output", path));
+        }
+        catch (Exception ex) {
+            logger.log(Level.SEVERE, String.format("read file %s : unexpected", path));
         }
         return "none";
     }
@@ -198,9 +199,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             fos.write(data.getBytes());
             fos.close();
         } catch (IOException ex) {
-            logger.log(Level.SEVERE, String.format("write file %s", path));
+            logger.log(Level.SEVERE, String.format("write file %s : input/output", path));
         }
-
+        catch (Exception ex) {
+            logger.log(Level.SEVERE, String.format("write file %s : unexpected", path));
+        }
     }
 
     private void showConnectionOff() {
@@ -217,7 +220,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             CharSequence name = "myCname";
             String description = "myCD";
-            int importance = NotificationManager.IMPORTANCE_DEFAULT;
+            Integer importance = NotificationManager.IMPORTANCE_DEFAULT;
             NotificationChannel channel = new NotificationChannel("101", name, importance);
             channel.setDescription(description);
 
@@ -227,12 +230,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     @SuppressLint("StaticFieldLeak")
-    class RequestSender extends AsyncTask<Void, Integer, Void> {
+    class RequestSender extends AsyncTask<Void, CODE, Void> {
         SSLSocketFactory getSSL() {
             try {
-                CertificateFactory cf = CertificateFactory.getInstance("X.509");
+                CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
                 InputStream caInput = new BufferedInputStream(getResources().openRawResource(R.raw.app));
-                Certificate ca = cf.generateCertificate(caInput);
+                Certificate ca = certFactory.generateCertificate(caInput);
                 caInput.close();
                 String keyStoreType = KeyStore.getDefaultType();
                 KeyStore keyStore = KeyStore.getInstance(keyStoreType);
@@ -245,9 +248,30 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 context.init(null, tmf.getTrustManagers(), null);
                 return context.getSocketFactory();
             } catch (CertificateException e) {
-                logger.log(Level.SEVERE, "SSL error", e);
+                logger.log(Level.SEVERE, "SSL error: certificate", e);
                 return null;
             }
+            catch (IOException e) {
+                logger.log(Level.SEVERE, "SSL error: input/output", e);
+                return null;
+            }
+            catch (KeyStoreException e) {
+                logger.log(Level.SEVERE, "SSL error: keystore", e);
+                return null;
+            }
+            catch (NoSuchAlgorithmException e) {
+                logger.log(Level.SEVERE, "SSL error: algorithm", e);
+                return null;
+            }
+            catch (KeyManagementException e) {
+                logger.log(Level.SEVERE, "SSL error: key management", e);
+                return null;
+            }
+            catch (Exception e) {
+                logger.log(Level.SEVERE, "SSL error: unexpected", e);
+                return null;
+            }
+
         }
 
         @SuppressLint("AllowAllHostnameVerifier")
@@ -259,18 +283,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     boolean endOperation = false;
                     while (!endOperation) {
                         try {
-<<<<<<< Updated upstream
-                            command=GetStringFromFile(CommandPath);
-                            logger.log(Level.INFO,"try to send command "+command);
-                            //ServerAddress="https://192.168.43.42:8080";//DEL
-                            //token="Q66U";//DEL
-                            URL obj = new URL(ServerAddress);
-=======
                             command = getStringFromFile(LAST_COMMAND_FILE_PATH);
                             logger.log(Level.INFO, String.format("try to send command %s", command));
 
                             URL obj = new URL(serverAddress);
->>>>>>> Stashed changes
                             HttpsURLConnection con = (HttpsURLConnection) obj.openConnection();
 
                             con.setHostnameVerifier(new AllowAllHostnameVerifier()); //only for testing app
@@ -286,11 +302,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             byte[] input = command.getBytes(StandardCharsets.UTF_8);
                             os.write(input, 0, input.length);
 
-<<<<<<< Updated upstream
                             int code=con.getResponseCode();
-=======
-                            int code = con.getResponseCode();
->>>>>>> Stashed changes
 
                             InputStreamReader isr = new InputStreamReader(con.getInputStream());
                             BufferedReader br = new BufferedReader(isr);
@@ -301,34 +313,29 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             }
                             br.close();
 
-<<<<<<< Updated upstream
-                            if (code==200)
+                            if (code==REQUEST_OK)
                             {
-                                publishProgress("connection on");
+                                publishProgress(CODE.CONNECTION_ON);
                                 endOperation=true;
-                                SetStringToFile("none", CommandPath);
-                                logger.log(Level.INFO,"command "+command+" sent, code: "+ code +" data: "+data);
+                                setStringToFile("none", LAST_COMMAND_FILE_PATH);
+                                logger.log(Level.INFO,String.format("command %s sent, code: %d",command,code));
                             }
                             else
                             {
-                                publishProgress("connection off");
-                                logger.log(Level.SEVERE,"connection error: code "+code);
+                                publishProgress(CODE.CONNECTION_OFF);
+                                logger.log(Level.SEVERE,String.format("connection error: code %d",code));
                             }
-=======
 
-                            publishProgress(CONNECTION_ON_CODE);
-                            endOperation = true;
-                            setStringToFile("none", LAST_COMMAND_FILE_PATH);
-                            logger.log(Level.INFO, String.format("command %s sent, code: %d", command, code));
-
->>>>>>> Stashed changes
                         } catch (Exception e) {
                             logger.log(Level.SEVERE, "connection failure", e);
-                            publishProgress(CONNECTION_OFF_CODE);
+                            publishProgress(CODE.CONNECTION_OFF);
                             try {
                                 TimeUnit.SECONDS.sleep(REQUESTS_TIMEOUT);
-                            } catch (InterruptedException ignored) {
-
+                            } catch (InterruptedException e2) {
+                                logger.log(Level.SEVERE, "timeout: interrupted",e2);
+                            }
+                            catch (Exception e2) {
+                                logger.log(Level.SEVERE, "timeout: unexpected",e2);
                             }
                         }
                     }
@@ -336,13 +343,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                 StringBuilder data = new StringBuilder();
                 try {
-<<<<<<< Updated upstream
-                    //ServerAddress="https://192.168.43.42:8080";//DEL
-                    //token="HeUb";//DEL
-                    URL url = new URL(ServerAddress);
-=======
                     URL url = new URL(serverAddress);
->>>>>>> Stashed changes
+
                     HttpsURLConnection con = (HttpsURLConnection) url.openConnection();
 
                     con.setHostnameVerifier(new AllowAllHostnameVerifier()); //only for testing app
@@ -351,63 +353,65 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     con.setRequestMethod("GET");
                     con.setRequestProperty("Content-Type", "text/html");
                     con.setRequestProperty("User-Agent", "mobile");
-<<<<<<< Updated upstream
+
                     con.setRequestProperty("token", token);
                     BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
-=======
+
                     con.setRequestProperty("Token", token);
 
                     InputStreamReader isr = new InputStreamReader(con.getInputStream());
                     BufferedReader br = new BufferedReader(isr);
->>>>>>> Stashed changes
+
                     String inputLine;
                     while ((inputLine = br.readLine()) != null) {
                         data.append(inputLine);
                     }
-<<<<<<< Updated upstream
+
                     in.close();
-                    int code=con.getResponseCode();
-                    if (code==200)
+                    br.close();
+
+                    Integer code=con.getResponseCode();
+
+                    if (code==REQUEST_OK)
                     {
-                        publishProgress("connection on");
+                        publishProgress(CODE.CONNECTION_ON);
                     }
                     else
                     {
-                        publishProgress("connection off");
-                        logger.log(Level.SEVERE,"connection error: code "+code);
+                        publishProgress(CODE.CONNECTION_OFF);
+                        logger.log(Level.SEVERE,String.format("connection error: code %d",code));
                     }
-=======
-                    br.close();
-                    publishProgress(CONNECTION_ON_CODE);
->>>>>>> Stashed changes
                 } catch (Exception e) {
                     logger.log(Level.SEVERE, "connection failure", e);
-                    publishProgress(CONNECTION_OFF_CODE);
+                    publishProgress(CODE.CONNECTION_OFF);
                 }
                 if (data.toString().equals("w")) {
-                    publishProgress(ALARM_CODE);
+                    publishProgress(CODE.ALARM);
 
                     try {
                         TimeUnit.SECONDS.sleep(REQUESTS_TIMEOUT);
-                    } catch (InterruptedException ignored) {
-
+                    } catch (InterruptedException e) {
+                        logger.log(Level.SEVERE, "timeout: interrupted");
+                    }
+                    catch (Exception e) {
+                        logger.log(Level.SEVERE, "timeout: unexpected");
                     }
                 }
             }
         }
 
         @Override
-        protected void onProgressUpdate(Integer... messages) {
+        protected void onProgressUpdate(CODE... messages) {
             super.onProgressUpdate(messages[0]);
 
             switch (messages[0]) {
-                case 0:
+                case CONNECTION_ON:
                     showConnectionOn();
                     break;
-                case 1:
+                case CONNECTION_OFF:
                     showConnectionOff();
                     break;
-                case 2:
+                case ALARM:
                     logger.log(Level.INFO, "alarm signal");
                     NotificationCompat.Builder builder = new NotificationCompat.Builder(getApplicationContext(), "101")
                             .setSmallIcon(R.drawable.signalicon)
@@ -425,6 +429,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     Date date = new Date();
                     textLastAlarm.setText(date.toString());
                     break;
+                default:
+                    logger.log(Level.WARNING, "server answer: unexpected");
             }
         }
     }
