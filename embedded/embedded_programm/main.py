@@ -4,18 +4,11 @@ import requests
 import time
 import logging
 
-from threading import Thread
-
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.SecurityWarning)
+from threading import Thread, Event
 
 
-alarm_working = True
-max_retryes = 5
 
-def ask_server(logger):
-    global alarm_working
-
+def ask_server(logger, alarm_working):
     headers = requests.utils.default_headers()
     headers.update(
             {
@@ -24,23 +17,33 @@ def ask_server(logger):
         )
 
     while True:
-        response = requests.get("https://serverapp:8080", headers=headers, verify="app.crt")
-        if response.status_code == 200:
-            if response.text == "on":
-                alarm_working = True
-                logger.info("Alarm state is on.")
-            elif response.text == "off":
-                alarm_working = False
-                logger.info("Alarm state is off.")
-            else:
-                if not response.text == "":
-                    logger.error("Error! Wrong answer from server then asking for alarm state.")
-        else:
-            logger.error("Error! Server status code: " + response.status_code)
+        try:
+            response = requests.get("https://serverapp:8080", 
+                                    headers=headers, 
+                                    verify="app.crt")
+            try:
+                response.rise_for_status()
+                if response.text == "on":
+                    alarm_working.set()
+                    logger.info("Alarm state is on.")
+                elif response.text == "off":
+                    alarm_working.clear()
+                    logger.info("Alarm state is off.")
+                else:
+                    if not response.text == "":
+                        logger.error("Wrong answer from server then asking state.")
+            except requests.HTTPError as http_error:
+                logger.error("Server status code: {http_error}")
+        except requests.Timeout:
+            logger.error("Server connection timeout.")
+        except requests.ConnectionError:
+            logger.error("Server connection error.")
+        except requests.RequestException as error:
+            logger.error(f"Error occured while server connection: {error}.")
         time.sleep(4)
 
 
-def watch_alarm(logger):
+def watch_alarm(logger, alarm_working):
     headers = requests.utils.default_headers()
     headers.update(
             {
@@ -56,20 +59,29 @@ def watch_alarm(logger):
     time.sleep(3)
  
     while True:
-        if alarm_working:
+        if alarm_working.is_set():
             rise = GPIO.wait_for_edge(detecter_channel, GPIO.RISING, 10000)
             logger.info("Alarm, catch signal from detector.")
             send = False
-            retryes = 0
-            while not send and retryes < max_retryes:
-                response = requests.post("https://serverapp:8080", data={"signal":"alarm"}, headers=headers, verify="app.crt")
-                retryes += 1
+            while not send:
+                try:
+                    response = requests.post("https://serverapp:8080", 
+                                             data={"signal":"alarm"}, 
+                                             headers=headers, 
+                                             verify="app.crt")
+                    try:
+                        response.rise_for_status()
+                        send = True
+                        logger.info("Message delivered to server.")
+                    except requests.HTTPError as http_error:
+                        logger.error("Server status code: {http_error}")
+                except requests.Timeout:
+                    logger.error("Server connection timeout.")
+                except requests.ConnectionError:
+                    logger.error("Server connection error.")
+                except requests.RequestException as error:
+                    logger.error(f"Error occured while server connection: {error}.")
                 GPIO.output(sound_channel, 1)
-                if response.status_code == 200:
-                    send = True
-                    logger.info("Message delivered to server.")
-                else:
-                    logger.error("Error! Server status code: " + response.status_code)
         time.sleep(4)
         GPIO.output(sound_channel, 0)
 
@@ -78,8 +90,10 @@ def watch_alarm(logger):
     GPIO.cleanup(sound_channel)
 
 def main():
-    logger = logging.getLogger('logger')
-    logging.basicConfig(level=logging.INFO, filename="python_alarm_log.log",filemode="w")
+    logger = logging.getLogger('python_alarm')
+    logging.basicConfig(level=logging.INFO, 
+                        filename="python_alarm_log.log",
+                        filemode="w")
 
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG)
@@ -87,8 +101,12 @@ def main():
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-    ask_server_thread = Thread(target=ask_server, args=(logger,))
-    watch_alarm_thread = Thread(target=watch_alarm, args=(logger,))
+    alarm_working = Event()
+
+    ask_server_thread = Thread(target=ask_server, 
+                               args=(logger, alarm_working))
+    watch_alarm_thread = Thread(target=watch_alarm, 
+                                args=(logger, alarm_working))
 
     ask_server_thread.start()
     watch_alarm_thread.start()
