@@ -41,9 +41,11 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def set_token(cls, token):
         cls.__token = token
 
+    def log_message(self, format, *args):
+        logger = SimpleHTTPRequestHandler.__logger
+        logger.info(''.join(args))
+        return
 
-    
-  # определяем метод `do_GET`
     def do_GET(self):          
         logger = SimpleHTTPRequestHandler.__logger
         token = SimpleHTTPRequestHandler.__token
@@ -53,8 +55,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         user_agent = str(self.headers['User-Agent'])
         user_token = str(self.headers['token'])
         if (user_agent == 'mobile'):
-            if (token == user_token):  
-                #print(to_client_message )    
+            if (token == user_token):     
                 logger.info("receive get from mobile")
                 if (SimpleHTTPRequestHandler.__to_client_message == ''):
                     self.wfile.write(str.encode("empty"))
@@ -67,7 +68,6 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.send_response(403)
                 self.end_headers()
         elif (user_agent=='Embedded'):
-            #if(from_mobile)
             logger.info("receive get from Embedded")  
             self.wfile.write(SimpleHTTPRequestHandler.__from_mobile)  #запрос включения/выключения от устройства 
             SimpleHTTPRequestHandler.__from_mobile = b''
@@ -76,7 +76,6 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_response(400)
             self.end_headers()
        
-    # определяем метод `do_POST` 
     def do_POST(self):
         logger = SimpleHTTPRequestHandler.__logger
         token = SimpleHTTPRequestHandler.__token
@@ -102,7 +101,6 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(str.encode(""))
             SimpleHTTPRequestHandler.__to_client_message ="notnull"
             logging.info("Receive post from Embedded. Alarm Signal")
-            print(body)
         else:
             logging.info("Unknown User")
             self.send_response(400)
@@ -113,6 +111,12 @@ def main():
     logger = logging.getLogger('logger')
     logging.basicConfig(level=logging.INFO, filename="py_log.log",filemode="w",
                     format="%(asctime)s %(levelname)s %(message)s")
+
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    formatter = logging.Formatter("%(levelname)s %(message)s")
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
     
     token = str(random_token())
     data = f"https://{str(get_local_ip())}:8080-{token}"
@@ -121,9 +125,9 @@ def main():
     f = io.StringIO()
     qr.print_ascii(out=f)
     f.seek(0)
-    print(f.read())
-    print(get_local_ip())
-    print(token)
+    logger.info(f.read())
+    logger.info(get_local_ip())
+    logger.info(token)
     SimpleHTTPRequestHandler.set_logger(logger)
     SimpleHTTPRequestHandler.set_token(token)
     httpd = HTTPServer(('', 8080), SimpleHTTPRequestHandler)
