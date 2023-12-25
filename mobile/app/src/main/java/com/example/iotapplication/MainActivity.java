@@ -37,6 +37,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
@@ -51,18 +52,37 @@ import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManagerFactory;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
-    int id=100;
-    TextView tv;
-    TextView tv2;
-    TextView tv_token;
-    Button btn_on;
-    Button btn_off;
-    Button btn_qr;
-    String CommandPath ="Command.txt";
-    String TokenPath="Token.txt";
-    String AddressPath="ServerAddress.txt";
+    Integer notificationId;
+
+    TextView textLastAlarm;
+    TextView textConnectionStatus;
+    TextView textToken;
+    Button buttonOn;
+    Button buttonOff;
+    Button buttonQR;
+
+    final String LAST_COMMAND_FILE_PATH = "Command.txt";
+    final String TOKEN_PATH = "Token.txt";
+    final String SERVER_ADDRESS_PATH = "ServerAddress.txt";
+
+    final Integer LOG_FILE_COUNT = 5;
+    final Integer LOG_SIZE = 102400;
+    final Boolean LOG_APPEND = true;
+    final String LOG_FILE_NAME_PATTERN = "Iot_App_Log_%g.log";
+
+    final Integer CONNECTION_TIMEOUT = 2000;
+    final Integer REQUESTS_TIMEOUT = 2;
+
+    final Integer FIRST_NOTIFICATION_ID = 100;
+    final Integer MAX_NOTIFICATION_ID = 200;
+
+
+    final Integer CONNECTION_ON_CODE = 0;
+    final Integer CONNECTION_OFF_CODE = 1;
+    final Integer ALARM_CODE = 2;
+
     Logger logger;
-    String ServerAddress;
+    String serverAddress;
     String token;
 
     @Override
@@ -70,44 +90,51 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        tv=findViewById(R.id.textView);
-        tv2=findViewById(R.id.textView2);
-        tv_token=findViewById(R.id.textView3);
-        btn_on = findViewById(R.id.button2);
-        btn_off = findViewById(R.id.button);
-        btn_qr = findViewById(R.id.button3);
+        textLastAlarm = findViewById(R.id.textView);
+        textConnectionStatus = findViewById(R.id.textView2);
+        textToken = findViewById(R.id.textView3);
+        buttonOn = findViewById(R.id.button2);
+        buttonOff = findViewById(R.id.button);
+        buttonQR = findViewById(R.id.button3);
+
+        notificationId = FIRST_NOTIFICATION_ID;
 
         logger = Logger.getLogger(MainActivity.class.getName());
-        logger.log(Level.INFO,"application start");
+        logger.log(Level.INFO, "application start");
 
-        //LOGGER CONFIG [BEGIN]
         try {
-            String logFileName = Environment.getExternalStorageDirectory() + File.separator + "Iot_App_Log_%g.log";
-            FileHandler logHandler = null;
-            logHandler = new FileHandler(logFileName, 100 * 1024, 5, true);
+            String logFileName = Environment.getExternalStorageDirectory() +
+                    File.separator +
+                    LOG_FILE_NAME_PATTERN;
+            FileHandler logHandler = new FileHandler(logFileName, LOG_SIZE,
+                    LOG_FILE_COUNT, LOG_APPEND);
             logHandler.setFormatter(new SimpleFormatter());
             logger.addHandler(logHandler);
-            logger.log(Level.INFO, "logger is ready");
-        } catch (Exception e) {
-            logger.log(Level.SEVERE, "logger is not ready");
-        }
-        //LOGGER CONFIG [END]
 
-        btn_on.setOnClickListener(v -> SetStringToFile("on", CommandPath));
-        btn_off.setOnClickListener(v -> SetStringToFile("off", CommandPath));
-        btn_qr.setOnClickListener(this);
+            logger.log(Level.INFO, "logger is ready");
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "logger is not ready",e);
+        }
+
+        buttonOn.setOnClickListener(v -> setStringToFile("on",
+                LAST_COMMAND_FILE_PATH));
+        buttonOff.setOnClickListener(v -> setStringToFile("off",
+                LAST_COMMAND_FILE_PATH));
+        buttonQR.setOnClickListener(this);
 
         createNotificationChannel();
 
-        token=GetStringFromFile(TokenPath);
-        ServerAddress=GetStringFromFile(AddressPath);
-        tv_token.setText(token);
+        token = getStringFromFile(TOKEN_PATH);
+        serverAddress = getStringFromFile(SERVER_ADDRESS_PATH);
 
-        ShowConnectionOff();
+        textToken.setText(token);
 
-        RequestSender RC = new RequestSender();
-        RC.execute();
+        showConnectionOff();
+
+        RequestSender requestSender = new RequestSender();
+        requestSender.execute();
     }
+
     @Override
     public void onClick(View v) {
         IntentIntegrator intentIntegrator = new IntentIntegrator(this);
@@ -115,64 +142,75 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         intentIntegrator.setOrientationLocked(true);
         intentIntegrator.initiateScan();
     }
+
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+    protected void onActivityResult(int requestCode,
+                                    int resultCode,
+                                    @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        IntentResult intentResult = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
+        IntentResult intentResult = IntentIntegrator.parseActivityResult(requestCode,
+                resultCode, data);
         if (intentResult != null) {
             if (intentResult.getContents() == null) {
                 logger.log(Level.WARNING, "QR reading - canceled");
             } else {
+<<<<<<< Updated upstream
                 String[] ConnectionData=intentResult.getContents().split("-");
                 ServerAddress=ConnectionData[0];
                 token=ConnectionData[1];
                 SetStringToFile(ServerAddress,AddressPath);
                 SetStringToFile(token,TokenPath);
                 tv_token.setText(ServerAddress+' '+token);
+=======
+                String[] ConnectionData = intentResult.getContents().split("-");
+                serverAddress = ConnectionData[0];
+                token = ConnectionData[1];
+
+                setStringToFile(serverAddress, SERVER_ADDRESS_PATH);
+                setStringToFile(token, TOKEN_PATH);
+
+                textToken.setText(token);
+>>>>>>> Stashed changes
             }
         } else {
             super.onActivityResult(requestCode, resultCode, data);
         }
     }
 
-    private String GetStringFromFile(String path)
-    {
+    private String getStringFromFile(String path) {
         try {
             FileInputStream fin = openFileInput(path);
             byte[] bytes = new byte[fin.available()];
             fin.read(bytes);
             fin.close();
-            return new String (bytes);
-        }
-        catch(FileNotFoundException ex) {
-            SetStringToFile("none",path);
-        }
-        catch(IOException ex) {
-            logger.log(Level.SEVERE,"read file "+path);
+            return new String(bytes);
+        } catch (FileNotFoundException ex) {
+            setStringToFile("none", path);
+        } catch (IOException ex) {
+            logger.log(Level.SEVERE, String.format("read file %s", path));
         }
         return "none";
     }
-    private void SetStringToFile(String data,String path)
-    {
+
+    private void setStringToFile(String data, String path) {
         try {
-            FileOutputStream fos = openFileOutput(path,MODE_PRIVATE);
+            FileOutputStream fos = openFileOutput(path, MODE_PRIVATE);
             fos.write(data.getBytes());
             fos.close();
-        }
-        catch(IOException ex) {
-            logger.log(Level.SEVERE,"write file "+path);
+        } catch (IOException ex) {
+            logger.log(Level.SEVERE, String.format("write file %s", path));
         }
 
     }
-    private void ShowConnectionOff()
-    {
-        tv2.setText("Подключение отсутствует");
-        tv2.setTextColor(Color.RED);
+
+    private void showConnectionOff() {
+        textConnectionStatus.setText("Подключение отсутствует");
+        textConnectionStatus.setTextColor(Color.RED);
     }
-    private void ShowConnectionOn()
-    {
-        tv2.setText("Подключено");
-        tv2.setTextColor(Color.GREEN);
+
+    private void showConnectionOn() {
+        textConnectionStatus.setText("Подключено");
+        textConnectionStatus.setTextColor(Color.GREEN);
     }
 
     private void createNotificationChannel() {
@@ -189,8 +227,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     @SuppressLint("StaticFieldLeak")
-    class RequestSender extends AsyncTask<Void, String, Void> {
-        SSLSocketFactory GetSSL() {
+    class RequestSender extends AsyncTask<Void, Integer, Void> {
+        SSLSocketFactory getSSL() {
             try {
                 CertificateFactory cf = CertificateFactory.getInstance("X.509");
                 InputStream caInput = new BufferedInputStream(getResources().openRawResource(R.raw.app));
@@ -206,34 +244,39 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 SSLContext context = SSLContext.getInstance("TLS");
                 context.init(null, tmf.getTrustManagers(), null);
                 return context.getSocketFactory();
-            }
-            catch (Exception e)
-            {
-                logger.log(Level.SEVERE,"SSL error",e);
+            } catch (CertificateException e) {
+                logger.log(Level.SEVERE, "SSL error", e);
                 return null;
             }
         }
+
         @SuppressLint("AllowAllHostnameVerifier")
         @Override
-        protected Void doInBackground(Void... voids)
-        {
+        protected Void doInBackground(Void... voids) {
             while (true) {
-                String command=GetStringFromFile(CommandPath);
-                if (!command.equals("none"))
-                {
-                    boolean endOperation=false;
+                String command = getStringFromFile(LAST_COMMAND_FILE_PATH);
+                if (!command.equals("none")) {
+                    boolean endOperation = false;
                     while (!endOperation) {
                         try {
+<<<<<<< Updated upstream
                             command=GetStringFromFile(CommandPath);
                             logger.log(Level.INFO,"try to send command "+command);
                             //ServerAddress="https://192.168.43.42:8080";//DEL
                             //token="Q66U";//DEL
                             URL obj = new URL(ServerAddress);
+=======
+                            command = getStringFromFile(LAST_COMMAND_FILE_PATH);
+                            logger.log(Level.INFO, String.format("try to send command %s", command));
+
+                            URL obj = new URL(serverAddress);
+>>>>>>> Stashed changes
                             HttpsURLConnection con = (HttpsURLConnection) obj.openConnection();
+
                             con.setHostnameVerifier(new AllowAllHostnameVerifier()); //only for testing app
-                            con.setSSLSocketFactory(GetSSL());
+                            con.setSSLSocketFactory(getSSL());
                             con.setRequestMethod("POST");
-                            con.setConnectTimeout(2000);
+                            con.setConnectTimeout(CONNECTION_TIMEOUT);
                             con.setRequestProperty("Content-Type", "text/html");
                             con.setRequestProperty("User-Agent", "mobile");
                             con.setRequestProperty("token", token);
@@ -243,17 +286,22 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             byte[] input = command.getBytes(StandardCharsets.UTF_8);
                             os.write(input, 0, input.length);
 
+<<<<<<< Updated upstream
                             int code=con.getResponseCode();
+=======
+                            int code = con.getResponseCode();
+>>>>>>> Stashed changes
 
-                            BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+                            InputStreamReader isr = new InputStreamReader(con.getInputStream());
+                            BufferedReader br = new BufferedReader(isr);
                             String inputLine;
-                            StringBuilder data=new StringBuilder();
-                            while ((inputLine = in.readLine()) != null)
-                            {
+                            StringBuilder data = new StringBuilder();
+                            while ((inputLine = br.readLine()) != null) {
                                 data.append(inputLine);
                             }
-                            in.close();
+                            br.close();
 
+<<<<<<< Updated upstream
                             if (code==200)
                             {
                                 publishProgress("connection on");
@@ -266,32 +314,57 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                                 publishProgress("connection off");
                                 logger.log(Level.SEVERE,"connection error: code "+code);
                             }
+=======
+
+                            publishProgress(CONNECTION_ON_CODE);
+                            endOperation = true;
+                            setStringToFile("none", LAST_COMMAND_FILE_PATH);
+                            logger.log(Level.INFO, String.format("command %s sent, code: %d", command, code));
+
+>>>>>>> Stashed changes
                         } catch (Exception e) {
-                            logger.log(Level.SEVERE,"connection failure",e);
-                            publishProgress("connection off");
-                            try {TimeUnit.SECONDS.sleep(2);} catch (InterruptedException ignored) {}
+                            logger.log(Level.SEVERE, "connection failure", e);
+                            publishProgress(CONNECTION_OFF_CODE);
+                            try {
+                                TimeUnit.SECONDS.sleep(REQUESTS_TIMEOUT);
+                            } catch (InterruptedException ignored) {
+
+                            }
                         }
                     }
                 }
 
                 StringBuilder data = new StringBuilder();
                 try {
+<<<<<<< Updated upstream
                     //ServerAddress="https://192.168.43.42:8080";//DEL
                     //token="HeUb";//DEL
                     URL url = new URL(ServerAddress);
+=======
+                    URL url = new URL(serverAddress);
+>>>>>>> Stashed changes
                     HttpsURLConnection con = (HttpsURLConnection) url.openConnection();
+
                     con.setHostnameVerifier(new AllowAllHostnameVerifier()); //only for testing app
-                    con.setSSLSocketFactory(GetSSL());
-                    con.setConnectTimeout(2000);
+                    con.setSSLSocketFactory(getSSL());
+                    con.setConnectTimeout(CONNECTION_TIMEOUT);
                     con.setRequestMethod("GET");
                     con.setRequestProperty("Content-Type", "text/html");
                     con.setRequestProperty("User-Agent", "mobile");
+<<<<<<< Updated upstream
                     con.setRequestProperty("token", token);
                     BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+=======
+                    con.setRequestProperty("Token", token);
+
+                    InputStreamReader isr = new InputStreamReader(con.getInputStream());
+                    BufferedReader br = new BufferedReader(isr);
+>>>>>>> Stashed changes
                     String inputLine;
-                    while ((inputLine = in.readLine()) != null) {
+                    while ((inputLine = br.readLine()) != null) {
                         data.append(inputLine);
                     }
+<<<<<<< Updated upstream
                     in.close();
                     int code=con.getResponseCode();
                     if (code==200)
@@ -303,22 +376,38 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         publishProgress("connection off");
                         logger.log(Level.SEVERE,"connection error: code "+code);
                     }
+=======
+                    br.close();
+                    publishProgress(CONNECTION_ON_CODE);
+>>>>>>> Stashed changes
                 } catch (Exception e) {
-                    logger.log(Level.SEVERE,"connection failure",e);
-                    publishProgress("connection off");
+                    logger.log(Level.SEVERE, "connection failure", e);
+                    publishProgress(CONNECTION_OFF_CODE);
                 }
-                publishProgress(data.toString());
+                if (data.toString().equals("w")) {
+                    publishProgress(ALARM_CODE);
 
-                try {TimeUnit.SECONDS.sleep(3);} catch (InterruptedException ignored) {}
+                    try {
+                        TimeUnit.SECONDS.sleep(REQUESTS_TIMEOUT);
+                    } catch (InterruptedException ignored) {
+
+                    }
+                }
             }
         }
 
         @Override
-        protected void onProgressUpdate(String... messages) {
+        protected void onProgressUpdate(Integer... messages) {
             super.onProgressUpdate(messages[0]);
 
             switch (messages[0]) {
-                case "w":
+                case 0:
+                    showConnectionOn();
+                    break;
+                case 1:
+                    showConnectionOff();
+                    break;
+                case 2:
                     logger.log(Level.INFO, "alarm signal");
                     NotificationCompat.Builder builder = new NotificationCompat.Builder(getApplicationContext(), "101")
                             .setSmallIcon(R.drawable.signalicon)
@@ -326,20 +415,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             .setContentText("сработала сигнализация")
                             .setPriority(NotificationCompat.PRIORITY_DEFAULT);
 
-                    id += 1;
-                    if (id > 200) id = 101;
+                    notificationId += 1;
+                    if (notificationId > MAX_NOTIFICATION_ID)
+                        notificationId = FIRST_NOTIFICATION_ID;
 
                     NotificationManagerCompat notificationManager = NotificationManagerCompat.from(getApplicationContext());
-                    notificationManager.notify(id, builder.build());
+                    notificationManager.notify(notificationId, builder.build());
 
                     Date date = new Date();
-                    tv.setText(date.toString());
-                    break;
-                case "connection on":
-                    ShowConnectionOn();
-                    break;
-                case "connection off":
-                    ShowConnectionOff();
+                    textLastAlarm.setText(date.toString());
                     break;
             }
         }
